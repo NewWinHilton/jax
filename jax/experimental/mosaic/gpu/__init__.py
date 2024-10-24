@@ -27,6 +27,7 @@ from .core import (
     Union as Union,
     as_gpu_kernel as as_gpu_kernel,
 )
+from .dialect_lowering import lower_mgpu_dialect
 from .fragmented_array import (
     FragmentedArray as FragmentedArray,
     FragmentedLayout as FragmentedLayout,
