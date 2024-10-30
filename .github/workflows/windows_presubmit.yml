@@ -1,27 +1,39 @@
-name: Wheel build - Windows CPU x86_64
+name: Presubmit - Windows CPU
 on:
-  workflow_dispatch: # allows triggering the workflow run manually
+  # TODO(DO_NOT_SUBMIT): temporary check
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read  # to fetch code
+  actions: write  # to cancel previous workflows
 
 env:
   DISTUTILS_USE_SDK: 1
   MSSdk: 1
 
 jobs:
-  win-wheels:
+  presubmit-win-wheels:
+    if: ${{ (github.event.action != 'labeled') || (github.event.label.name == 'windows:force-run')}}
     strategy:
-      fail-fast: false  # Don't stop all wheel builds if one has a test failure.
+      fail-fast: true
       matrix:
         os: [windows-2019-32core]
         arch: [AMD64]
-        pyver: ['3.10', '3.11', '3.12', '3.13']
-    name: ${{ matrix.os }} ${{ matrix.pyver }} jaxlib wheel build
+        pyver: ['3.10']
+    name: ${{ matrix.os }} Windows build
     runs-on: ${{ matrix.os }}
 
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@85880fa0301c86cca9da44039ee3bb12d3bedbfa # ratchet: styfle/cancel-workflow-action@0.12.1
+        with:
+          access_token: ${{ github.token }}
+
       - name: Install LLVM/Clang
         run: choco install llvm --version=18.1.4 --yes --no-progress --allow-downgrade
 
@@ -42,13 +54,8 @@ jobs:
           "C:\\msys64\\;C:\\msys64\\usr\\bin\\;" >> $env:GITHUB_PATH
           python.exe build\build.py jaxlib --verbose `
             --bazel_build_options='--verbose_failures=true' `
-            --bazel_build_options='--config=win_clang'
-
-      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
-        with:
-          name: wheels-${{ matrix.os }}-${{ matrix.pyver }}
-          path: ${{ github.workspace }}\dist\*.whl
-          retention-days: 5
+            --bazel_build_options="--config=win_clang" `
+            --bazel_build_options='--color=yes'
 
       - name: Run tests
         env:
